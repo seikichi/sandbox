@@ -9,15 +9,17 @@ command -> Expr
   / c:add { c }
   / c:sub { c }
   / c:clear { c }
+  / c:scan_right { c }
+  / c:scan_left { c }
   / "." { Expr::Out }
   / "," { Expr::In }
   / "[" commands:command* "]" { Expr::Loop(commands) }
 
 right -> Expr
-  = commands:">"+ { Expr::Right(commands.len() as u8) }
+  = commands:">"+ { Expr::Right(commands.len()) }
 
 left -> Expr
-  = commands:"<"+ { Expr::Left(commands.len() as u8) }
+  = commands:"<"+ { Expr::Left(commands.len()) }
 
 add -> Expr
   = commands:"+"+ { Expr::Add(commands.len() as u8) }
@@ -28,3 +30,35 @@ sub -> Expr
 clear -> Expr
   = "[-]" { Expr::Clear }
   / "[+]" { Expr::Clear }
+
+scan_right -> Expr
+  = "[>]" { Expr::ScanRight }
+
+scan_left -> Expr
+  = "[>]" { Expr::ScanLeft }
+
+// experiments
+
+multiplication_loop -> Expr
+  = "[-" cs:coeffs "]" {
+    let mut commands = vec![];
+    for (i, c) in cs.iter().enumerate() {
+       if *c == 0 {
+         continue;
+       }
+       if *c > 0 {
+         commands.push(Expr::AddMul(i + 1, *c as u8));
+       }
+       if *c < 0 {
+         commands.push(Expr::SubMul(i + 1, (-*c) as u8));
+       }
+    }
+    commands.push(Expr::Clear);
+    Expr::Block(commands)
+  }
+
+coeffs -> Vec<i32>
+  = ">" count:"+"* "<" { vec![count.len() as i32] }
+  / ">" count:"-"* "<" { vec![-(count.len() as i32)] }
+  / ">" count:"+"* tail:coeffs "<" { let mut coeffs = vec![count.len() as i32]; coeffs.extend(tail.iter().cloned()); coeffs }
+  / ">" count:"-"* tail:coeffs "<" { let mut coeffs = vec![-(count.len() as i32)]; coeffs.extend(tail.iter().cloned()); coeffs }

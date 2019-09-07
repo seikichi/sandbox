@@ -23,8 +23,8 @@ impl<R: Read, W: Write> Interpreter<R, W> {
     pub fn eval(&mut self, commands: &[Expr]) {
         for e in commands {
             match e {
-                Expr::Right(count) => self.address += *count as usize,
-                Expr::Left(count) => self.address -= *count as usize,
+                Expr::Right(count) => self.address += *count,
+                Expr::Left(count) => self.address -= *count,
                 Expr::Add(count) => {
                     self.memory[self.address] = self.memory[self.address].wrapping_add(*count)
                 }
@@ -43,6 +43,31 @@ impl<R: Read, W: Write> Interpreter<R, W> {
                     }
                 }
                 Expr::Clear => self.memory[self.address] = 0,
+                Expr::ScanRight => {
+                    while self.memory[self.address] != 0 {
+                        self.address += 1;
+                    }
+                }
+                Expr::ScanLeft => {
+                    while self.memory[self.address] != 0 {
+                        self.address -= 1;
+                    }
+                }
+                Expr::Block(commands) => {
+                    self.eval(&commands);
+                }
+                Expr::AddMul(offset, coeff) => {
+                    let p = self.memory[self.address];
+                    let addr = self.address + *offset;
+                    let now = self.memory[addr];
+                    self.memory[addr] = now.wrapping_add(p.wrapping_mul(*coeff));
+                }
+                Expr::SubMul(offset, coeff) => {
+                    let p = self.memory[self.address];
+                    let addr = self.address + *offset;
+                    let now = self.memory[addr];
+                    self.memory[addr] = now.wrapping_sub(p.wrapping_mul(*coeff));
+                }
             }
         }
     }
