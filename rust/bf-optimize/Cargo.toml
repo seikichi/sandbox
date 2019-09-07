@@ -1,5 +1,5 @@
 [package]
-name = "bf-optimize"
+name = "bf_optimize"
 version = "0.1.0"
 authors = ["Seiichi KONDO <seikichi@kmc.gr.jp>"]
 edition = "2018"
