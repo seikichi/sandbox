@@ -1,0 +1,30 @@
+use super::Expr;
+
+pub program -> Vec<Expr>
+  = commands:(command*) { commands }
+
+command -> Expr
+  = c:right { c }
+  / c:left { c }
+  / c:add { c }
+  / c:sub { c }
+  / c:clear { c }
+  / "." { Expr::Out }
+  / "," { Expr::In }
+  / "[" commands:command* "]" { Expr::Loop(commands) }
+
+right -> Expr
+  = commands:">"+ { Expr::Right(commands.len() as u8) }
+
+left -> Expr
+  = commands:"<"+ { Expr::Left(commands.len() as u8) }
+
+add -> Expr
+  = commands:"+"+ { Expr::Add(commands.len() as u8) }
+
+sub -> Expr
+  = commands:"-"+ { Expr::Sub(commands.len() as u8) }
+
+clear -> Expr
+  = "[-]" { Expr::Clear }
+  / "[+]" { Expr::Clear }
