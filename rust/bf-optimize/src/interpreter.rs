@@ -20,34 +20,46 @@ impl<R: Read, W: Write> Interpreter<R, W> {
         }
     }
 
+    fn address(&self, offset: usize, positive: bool) -> usize {
+        if positive {
+            self.address + offset
+        } else {
+            self.address - offset
+        }
+    }
+
     pub fn eval(&mut self, commands: &[Expr]) {
         for e in commands {
             match e {
                 Expr::Right(count) => self.address += *count,
                 Expr::Left(count) => self.address -= *count,
-                Expr::Add(count, offset) => {
-                    let addr = self.address + offset;
+                Expr::Add(count, offset, positive) => {
+                    let addr = self.address(*offset, *positive);
                     self.memory[addr] = self.memory[addr].wrapping_add(*count)
                 }
-                Expr::Sub(count, offset) => {
-                    let addr = self.address + offset;
+                Expr::Sub(count, offset, positive) => {
+                    let addr = self.address(*offset, *positive);
                     self.memory[addr] = self.memory[addr].wrapping_sub(*count)
                 }
-                Expr::Out(offset) => {
-                    let addr = self.address + offset;
+                Expr::Out(offset, positive) => {
+                    let addr = self.address(*offset, *positive);
                     self.writer.write_all(&[self.memory[addr]]).unwrap();
                 }
-                Expr::In(offset) => {
+                Expr::In(offset, positive) => {
                     let mut buf = vec![0; 1];
                     let _ = self.reader.read(&mut buf).unwrap();
-                    self.memory[self.address + offset] = buf[0];
+                    let addr = self.address(*offset, *positive);
+                    self.memory[addr] = buf[0];
                 }
                 Expr::Loop(commands) => {
                     while self.memory[self.address] != 0 {
                         self.eval(&commands);
                     }
                 }
-                Expr::Clear(offset) => self.memory[self.address + offset] = 0,
+                Expr::Clear(offset, positive) => {
+                    let addr = self.address(*offset, *positive);
+                    self.memory[addr] = 0;
+                }
                 Expr::ScanRight => {
                     while self.memory[self.address] != 0 {
                         self.address += 1;

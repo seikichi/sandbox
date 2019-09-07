@@ -22,25 +22,66 @@ left -> Expr
   = commands:"<"+ { Expr::Left(commands.len()) }
 
 add -> Expr
-  = ">" c:add "<" { match c { Expr::Add(count, offset) => Expr::Add(count, offset + 1), _ => panic!("parse failed") } }
-  / commands:"+"+ { Expr::Add(commands.len() as u8, 0) }
+  = c:add_pos_offset { c }
+  / c:add_neg_offset { c }
+
+add_pos_offset -> Expr
+  = ">" c:add_pos_offset "<" { match c { Expr::Add(count, offset, _) => Expr::Add(count, offset + 1, true), _ => panic!("parse failed") } }
+  / commands:"+"+ { Expr::Add(commands.len() as u8, 0, true) }
+
+add_neg_offset -> Expr
+  = "<" c:add_neg_offset ">" { match c { Expr::Add(count, offset, _) => Expr::Add(count, offset + 1, false), _ => panic!("parse failed") } }
+  / commands:"+"+ { Expr::Add(commands.len() as u8, 0, false) }
 
 sub -> Expr
-  = ">" c:sub "<" { match c { Expr::Sub(count, offset) => Expr::Sub(count, offset + 1), _ => panic!("parse failed") } }
-  / commands:"-"+ { Expr::Sub(commands.len() as u8, 0) }
+  = c:sub_pos_offset { c }
+  / c:sub_neg_offset { c }
+
+sub_pos_offset -> Expr
+  = ">" c:sub_pos_offset "<" { match c { Expr::Sub(count, offset, _) => Expr::Sub(count, offset + 1, true), _ => panic!("parse failed") } }
+  / commands:"-"+ { Expr::Sub(commands.len() as u8, 0, true) }
+
+sub_neg_offset -> Expr
+  = "<" c:sub_neg_offset ">" { match c { Expr::Sub(count, offset, _) => Expr::Sub(count, offset + 1, false), _ => panic!("parse failed") } }
+  / commands:"-"+ { Expr::Sub(commands.len() as u8, 0, false) }
 
 clear -> Expr
-  = ">" c:clear "<" { match c { Expr::Clear(offset) => Expr::Clear(offset + 1), _ => panic!("parse failed") } }
-  / "[-]" { Expr::Clear(0) }
-  / "[+]" { Expr::Clear(0) }
+  = clear_pos_offset
+  / clear_neg_offset
+
+clear_pos_offset -> Expr
+  = ">" c:clear_pos_offset "<" { match c { Expr::Clear(offset, _) => Expr::Clear(offset + 1, true), _ => panic!("parse failed") } }
+  / "[-]" { Expr::Clear(0, true) }
+  / "[+]" { Expr::Clear(0, true) }
+
+clear_neg_offset -> Expr
+  = "<" c:clear_neg_offset ">" { match c { Expr::Clear(offset, _) => Expr::Clear(offset + 1, false), _ => panic!("parse failed") } }
+  / "[-]" { Expr::Clear(0, false) }
+  / "[+]" { Expr::Clear(0, false) }
 
 out -> Expr
-  = ">" c:out "<" { match c { Expr::Out(offset) => Expr::Out(offset + 1), _ => panic!("parse failed") } }
-  / "." { Expr::Out(0) }
+  = out_pos_offset
+  / out_neg_offset
+
+out_pos_offset -> Expr
+  = ">" c:out_pos_offset "<" { match c { Expr::Out(offset, _) => Expr::Out(offset + 1, true), _ => panic!("parse failed") } }
+  / "." { Expr::Out(0, true) }
+
+out_neg_offset -> Expr
+  = "<" c:out_neg_offset ">" { match c { Expr::Out(offset, _) => Expr::Out(offset + 1, false), _ => panic!("parse failed") } }
+  / "." { Expr::Out(0, false) }
 
 in -> Expr
-  = ">" c:in "<" { match c { Expr::In(offset) => Expr::In(offset + 1), _ => panic!("parse failed") } }
-  / "," { Expr::In(0) }
+  = in_pos_offset
+  / in_neg_offset
+
+in_pos_offset -> Expr
+  = ">" c:in_pos_offset "<" { match c { Expr::In(offset, _) => Expr::In(offset + 1, true), _ => panic!("parse failed") } }
+  / "," { Expr::In(0, true) }
+
+in_neg_offset -> Expr
+  = "<" c:in_neg_offset ">" { match c { Expr::In(offset, _) => Expr::In(offset + 1, false), _ => panic!("parse failed") } }
+  / "," { Expr::In(0, false) }
 
 scan_right -> Expr
   = "[>]" { Expr::ScanRight }

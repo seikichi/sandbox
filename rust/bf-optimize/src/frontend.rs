@@ -1,13 +1,13 @@
 #[derive(Debug, PartialEq, Eq)]
 pub enum Expr {
-    Add(u8, usize),
-    Sub(u8, usize),
+    Add(u8, usize, bool),
+    Sub(u8, usize, bool),
     Right(usize),
     Left(usize),
-    Out(usize),
-    In(usize),
+    Out(usize, bool),
+    In(usize, bool),
     Loop(Vec<Expr>),
-    Clear(usize),
+    Clear(usize, bool),
     ScanRight,
     ScanLeft,
 }
