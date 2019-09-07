@@ -25,24 +25,29 @@ impl<R: Read, W: Write> Interpreter<R, W> {
             match e {
                 Expr::Right(count) => self.address += *count,
                 Expr::Left(count) => self.address -= *count,
-                Expr::Add(count) => {
-                    self.memory[self.address] = self.memory[self.address].wrapping_add(*count)
+                Expr::Add(count, offset) => {
+                    let addr = self.address + offset;
+                    self.memory[addr] = self.memory[addr].wrapping_add(*count)
                 }
-                Expr::Sub(count) => {
-                    self.memory[self.address] = self.memory[self.address].wrapping_sub(*count)
+                Expr::Sub(count, offset) => {
+                    let addr = self.address + offset;
+                    self.memory[addr] = self.memory[addr].wrapping_sub(*count)
                 }
-                Expr::Out => self.writer.write_all(&[self.memory[self.address]]).unwrap(),
-                Expr::In => {
+                Expr::Out(offset) => {
+                    let addr = self.address + offset;
+                    self.writer.write_all(&[self.memory[addr]]).unwrap();
+                }
+                Expr::In(offset) => {
                     let mut buf = vec![0; 1];
                     let _ = self.reader.read(&mut buf).unwrap();
-                    self.memory[self.address] = buf[0];
+                    self.memory[self.address + offset] = buf[0];
                 }
                 Expr::Loop(commands) => {
                     while self.memory[self.address] != 0 {
                         self.eval(&commands);
                     }
                 }
-                Expr::Clear => self.memory[self.address] = 0,
+                Expr::Clear(offset) => self.memory[self.address + offset] = 0,
                 Expr::ScanRight => {
                     while self.memory[self.address] != 0 {
                         self.address += 1;
@@ -52,21 +57,6 @@ impl<R: Read, W: Write> Interpreter<R, W> {
                     while self.memory[self.address] != 0 {
                         self.address -= 1;
                     }
-                }
-                Expr::Block(commands) => {
-                    self.eval(&commands);
-                }
-                Expr::AddMul(offset, coeff) => {
-                    let p = self.memory[self.address];
-                    let addr = self.address + *offset;
-                    let now = self.memory[addr];
-                    self.memory[addr] = now.wrapping_add(p.wrapping_mul(*coeff));
-                }
-                Expr::SubMul(offset, coeff) => {
-                    let p = self.memory[self.address];
-                    let addr = self.address + *offset;
-                    let now = self.memory[addr];
-                    self.memory[addr] = now.wrapping_sub(p.wrapping_mul(*coeff));
                 }
             }
         }

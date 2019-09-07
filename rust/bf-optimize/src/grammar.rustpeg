@@ -4,15 +4,15 @@ pub program -> Vec<Expr>
   = commands:(command*) { commands }
 
 command -> Expr
-  = c:right { c }
-  / c:left { c }
-  / c:add { c }
+  = c:add { c }
   / c:sub { c }
+  / c:out { c }
+  / c:in { c}
   / c:clear { c }
+  / c:right { c }
+  / c:left { c }
   / c:scan_right { c }
   / c:scan_left { c }
-  / "." { Expr::Out }
-  / "," { Expr::In }
   / "[" commands:command* "]" { Expr::Loop(commands) }
 
 right -> Expr
@@ -22,43 +22,28 @@ left -> Expr
   = commands:"<"+ { Expr::Left(commands.len()) }
 
 add -> Expr
-  = commands:"+"+ { Expr::Add(commands.len() as u8) }
+  = ">" c:add "<" { match c { Expr::Add(count, offset) => Expr::Add(count, offset + 1), _ => panic!("parse failed") } }
+  / commands:"+"+ { Expr::Add(commands.len() as u8, 0) }
 
 sub -> Expr
-  = commands:"-"+ { Expr::Sub(commands.len() as u8) }
+  = ">" c:sub "<" { match c { Expr::Sub(count, offset) => Expr::Sub(count, offset + 1), _ => panic!("parse failed") } }
+  / commands:"-"+ { Expr::Sub(commands.len() as u8, 0) }
 
 clear -> Expr
-  = "[-]" { Expr::Clear }
-  / "[+]" { Expr::Clear }
+  = ">" c:clear "<" { match c { Expr::Clear(offset) => Expr::Clear(offset + 1), _ => panic!("parse failed") } }
+  / "[-]" { Expr::Clear(0) }
+  / "[+]" { Expr::Clear(0) }
+
+out -> Expr
+  = ">" c:out "<" { match c { Expr::Out(offset) => Expr::Out(offset + 1), _ => panic!("parse failed") } }
+  / "." { Expr::Out(0) }
+
+in -> Expr
+  = ">" c:in "<" { match c { Expr::In(offset) => Expr::In(offset + 1), _ => panic!("parse failed") } }
+  / "," { Expr::In(0) }
 
 scan_right -> Expr
   = "[>]" { Expr::ScanRight }
 
 scan_left -> Expr
   = "[>]" { Expr::ScanLeft }
-
-// experiments
-
-multiplication_loop -> Expr
-  = "[-" cs:coeffs "]" {
-    let mut commands = vec![];
-    for (i, c) in cs.iter().enumerate() {
-       if *c == 0 {
-         continue;
-       }
-       if *c > 0 {
-         commands.push(Expr::AddMul(i + 1, *c as u8));
-       }
-       if *c < 0 {
-         commands.push(Expr::SubMul(i + 1, (-*c) as u8));
-       }
-    }
-    commands.push(Expr::Clear);
-    Expr::Block(commands)
-  }
-
-coeffs -> Vec<i32>
-  = ">" count:"+"* "<" { vec![count.len() as i32] }
-  / ">" count:"-"* "<" { vec![-(count.len() as i32)] }
-  / ">" count:"+"* tail:coeffs "<" { let mut coeffs = vec![count.len() as i32]; coeffs.extend(tail.iter().cloned()); coeffs }
-  / ">" count:"-"* tail:coeffs "<" { let mut coeffs = vec![-(count.len() as i32)]; coeffs.extend(tail.iter().cloned()); coeffs }

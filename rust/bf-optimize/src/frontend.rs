@@ -1,18 +1,15 @@
 #[derive(Debug, PartialEq, Eq)]
 pub enum Expr {
-    Add(u8),
-    Sub(u8),
+    Add(u8, usize),
+    Sub(u8, usize),
     Right(usize),
     Left(usize),
-    Out,
-    In,
+    Out(usize),
+    In(usize),
     Loop(Vec<Expr>),
-    Clear,
+    Clear(usize),
     ScanRight,
     ScanLeft,
-    AddMul(usize, u8),
-    SubMul(usize, u8),
-    Block(Vec<Expr>),
 }
 
 pub mod parser {
