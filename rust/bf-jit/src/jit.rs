@@ -100,7 +100,6 @@ impl JIT {
         builder.def_var(ptr, zero);
 
         let mut translator = FunctionTranslator {
-            pointer_type,
             builder,
             getchar,
             putchar,
@@ -116,7 +115,6 @@ impl JIT {
 }
 
 struct FunctionTranslator<'a> {
-    pointer_type: types::Type,
     builder: FunctionBuilder<'a>,
     getchar: codegen::ir::entities::FuncRef,
     putchar: codegen::ir::entities::FuncRef,
@@ -132,34 +130,24 @@ impl<'a> FunctionTranslator<'a> {
                     let p = self.builder.use_var(self.ptr);
                     let p = self.builder.ins().iadd(self.data, p);
                     let v = self.builder.ins().load(types::I32, MemFlags::new(), p, 0);
-                    let c = self.builder.ins().iconst(types::I32, i64::from(*count));
-                    let s = self.builder.ins().iadd(v, c);
+                    let s = self.builder.ins().iadd_imm(v, i64::from(*count));
                     self.builder.ins().store(MemFlags::new(), s, p, 0);
                 }
                 Expr::Sub(count) => {
                     let p = self.builder.use_var(self.ptr);
                     let p = self.builder.ins().iadd(self.data, p);
                     let v = self.builder.ins().load(types::I32, MemFlags::new(), p, 0);
-                    let c = self.builder.ins().iconst(types::I32, i64::from(*count));
-                    let s = self.builder.ins().isub(v, c);
+                    let s = self.builder.ins().iadd_imm(v, -i64::from(*count));
                     self.builder.ins().store(MemFlags::new(), s, p, 0);
                 }
                 Expr::Right(offset) => {
                     let p = self.builder.use_var(self.ptr);
-                    let c = self
-                        .builder
-                        .ins()
-                        .iconst(self.pointer_type, 4 * (*offset as i64));
-                    let v = self.builder.ins().iadd(p, c);
+                    let v = self.builder.ins().iadd_imm(p, 4 * (*offset as i64));
                     self.builder.def_var(self.ptr, v);
                 }
                 Expr::Left(offset) => {
                     let p = self.builder.use_var(self.ptr);
-                    let c = self
-                        .builder
-                        .ins()
-                        .iconst(self.pointer_type, 4 * (*offset as i64));
-                    let v = self.builder.ins().isub(p, c);
+                    let v = self.builder.ins().iadd_imm(p, -4 * (*offset as i64));
                     self.builder.def_var(self.ptr, v);
                 }
                 Expr::Clear => {
