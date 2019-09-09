@@ -1,4 +1,5 @@
 use super::frontend::*;
+use super::optimizer::*;
 
 use cranelift::prelude::*;
 use cranelift_module::{default_libcall_names, DataContext, Linkage, Module};
@@ -30,7 +31,10 @@ impl JIT {
     }
 
     pub fn compile(&mut self, input: &str) -> Result<*const u8, String> {
-        let commands = parser::program(&input).unwrap();
+        let mut commands = parser::program(&input).unwrap();
+        let mut optimizer = Optimizer::new();
+        optimizer.optimize(&mut commands);
+
         self.initialize_memory();
         self.translate(&commands).unwrap();
 
@@ -123,51 +127,41 @@ struct FunctionTranslator<'a> {
 }
 
 impl<'a> FunctionTranslator<'a> {
+    fn address(&mut self, offset: isize) -> Value {
+        let p = self.builder.use_var(self.ptr);
+        let p = self.builder.ins().iadd(self.data, p);
+        self.builder.ins().iadd_imm(p, 4 * (offset as i64))
+    }
+
     fn translate(&mut self, commands: &[Expr]) {
         for expr in commands {
             match expr {
-                Expr::Add(count) => {
-                    let p = self.builder.use_var(self.ptr);
-                    let p = self.builder.ins().iadd(self.data, p);
+                Expr::Add(count, offset) => {
+                    let p = self.address(*offset);
                     let v = self.builder.ins().load(types::I32, MemFlags::new(), p, 0);
                     let s = self.builder.ins().iadd_imm(v, i64::from(*count));
                     self.builder.ins().store(MemFlags::new(), s, p, 0);
                 }
-                Expr::Sub(count) => {
-                    let p = self.builder.use_var(self.ptr);
-                    let p = self.builder.ins().iadd(self.data, p);
-                    let v = self.builder.ins().load(types::I32, MemFlags::new(), p, 0);
-                    let s = self.builder.ins().iadd_imm(v, -i64::from(*count));
-                    self.builder.ins().store(MemFlags::new(), s, p, 0);
-                }
-                Expr::Right(offset) => {
+                Expr::Move(offset) => {
                     let p = self.builder.use_var(self.ptr);
                     let v = self.builder.ins().iadd_imm(p, 4 * (*offset as i64));
                     self.builder.def_var(self.ptr, v);
                 }
-                Expr::Left(offset) => {
-                    let p = self.builder.use_var(self.ptr);
-                    let v = self.builder.ins().iadd_imm(p, -4 * (*offset as i64));
-                    self.builder.def_var(self.ptr, v);
-                }
-                Expr::Clear => {
-                    let p = self.builder.use_var(self.ptr);
-                    let p = self.builder.ins().iadd(self.data, p);
+                Expr::Clear(offset) => {
+                    let p = self.address(*offset);
                     let zero = self.builder.ins().iconst(types::I32, 0);
                     self.builder.ins().store(MemFlags::new(), zero, p, 0);
                 }
-                Expr::Out => {
-                    let p = self.builder.use_var(self.ptr);
-                    let p = self.builder.ins().iadd(self.data, p);
+                Expr::Out(offset) => {
+                    let p = self.address(*offset);
                     let v = self.builder.ins().load(types::I32, MemFlags::new(), p, 0);
                     self.builder.ins().call(self.putchar, &[v]);
                 }
-                Expr::In => {
+                Expr::In(offset) => {
                     let call = self.builder.ins().call(self.getchar, &[]);
                     let result = self.builder.inst_results(call)[0];
 
-                    let p = self.builder.use_var(self.ptr);
-                    let p = self.builder.ins().iadd(self.data, p);
+                    let p = self.address(*offset);
                     self.builder.ins().store(MemFlags::new(), result, p, 0);
                 }
                 Expr::Loop(commands) => {
@@ -176,8 +170,7 @@ impl<'a> FunctionTranslator<'a> {
                     self.builder.ins().jump(header_block, &[]);
                     self.builder.switch_to_block(header_block);
 
-                    let p = self.builder.use_var(self.ptr);
-                    let p = self.builder.ins().iadd(self.data, p);
+                    let p = self.address(0);
                     let flag = self.builder.ins().load(types::I32, MemFlags::new(), p, 0);
                     self.builder.ins().brz(flag, exit_block, &[]);
 
@@ -189,6 +182,7 @@ impl<'a> FunctionTranslator<'a> {
                     self.builder.seal_block(header_block);
                     self.builder.seal_block(exit_block);
                 }
+                Expr::Nop => (),
             }
         }
     }

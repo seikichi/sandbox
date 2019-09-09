@@ -1,5 +1,6 @@
 mod frontend;
 mod jit;
+mod optimizer;
 
 use std::env;
 use std::fs::File;

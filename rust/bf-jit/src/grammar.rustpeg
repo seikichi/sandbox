@@ -14,25 +14,25 @@ command -> Expr
   / c:loop  { c }
 
 right -> Expr
-  = commands:">"+ { Expr::Right(commands.len()) }
+  = commands:">"+ { Expr::Move(commands.len() as isize) }
 
 left -> Expr
-  = commands:"<"+ { Expr::Left(commands.len()) }
+  = commands:"<"+ { Expr::Move(-(commands.len() as isize)) }
 
 add -> Expr
-  = commands:"+"+ { Expr::Add(commands.len() as i32) }
+  = commands:"+"+ { Expr::Add(commands.len() as i32, 0) }
 
 sub -> Expr
-  = commands:"-"+ { Expr::Sub(commands.len() as i32) }
+  = commands:"-"+ { Expr::Add(-(commands.len() as i32), 0) }
 
 clear -> Expr
-  = "[-]" { Expr::Clear }
+  = "[-]" { Expr::Clear(0) }
 
 out -> Expr
-  = "." { Expr::Out }
+  = "." { Expr::Out(0) }
 
 in -> Expr
-  = "," { Expr::In }
+  = "," { Expr::In(0) }
 
 loop -> Expr
   =  "[" commands:command* "]" { Expr::Loop(commands) }
