@@ -17,9 +17,51 @@ impl Optimizer {
 
             if let Expr::Loop(children) = &mut commands[i] {
                 self.optimize(children);
+                if self.can_convert_to_multiplication(children) {
+                    commands[i] = self.optimize_multiplication(children);
+                }
             }
         }
         self.optimize_lazy_move(&mut commands[start..]);
+    }
+
+    fn can_convert_to_multiplication(&mut self, commands: &[Expr]) -> bool {
+        // commands contains Expr::Add only
+        let only_add = commands.iter().all(|c| match c {
+            Expr::Add(_, _) | Expr::Nop => true,
+            _ => false,
+        });
+        if !only_add {
+            return false;
+        }
+
+        // commands contains a Expr::Add(-1, 0)
+        let mut zeros = commands.iter().filter(|c| match c {
+            Expr::Add(_, 0) => true,
+            _ => false,
+        });
+        if zeros.next() != Some(&Expr::Add(-1, 0)) {
+            return false;
+        }
+        if zeros.next() != None {
+            return false;
+        }
+
+        true
+    }
+
+    fn optimize_multiplication(&mut self, commands: &[Expr]) -> Expr {
+        let mut new = vec![];
+        for c in commands {
+            match c {
+                Expr::Add(count, offset) if *offset != 0 => {
+                    new.push(Expr::Mul(*count, *offset));
+                }
+                _ => (),
+            }
+        }
+        new.push(Expr::Clear(0));
+        Expr::Block(new)
     }
 
     fn optimize_lazy_move(&mut self, commands: &mut [Expr]) {
@@ -48,7 +90,7 @@ impl Optimizer {
                     j += 1;
                 }
                 Expr::Nop => {}
-                Expr::Loop(_) => panic!("optimize_lazy_move meets Expr::Loop"),
+                _ => panic!("optimize_lazy_move meets an unsupported command"),
             }
         }
 
@@ -84,14 +126,10 @@ fn test_put_h_optimize() {
     let expected = vec![
         Expr::Add(9, 1),
         Expr::Move(1),
-        Expr::Loop(vec![
-            Expr::Add(8, -1),
-            Expr::Add(-1, 0),
-            Expr::Nop,
-            Expr::Nop,
-        ]),
+        Expr::Block(vec![Expr::Mul(8, -1), Expr::Clear(0)]),
         Expr::Out(-1),
         Expr::Move(-1),
     ];
+
     assert_eq!(commands, expected);
 }
