@@ -7,22 +7,28 @@ impl Optimizer {
         Self {}
     }
 
-    pub fn optimize(&mut self, commands: &mut Vec<Expr>) {
-        let mut start = 0;
-        for i in 0..commands.len() {
-            if let Expr::Loop(_) = commands[i] {
-                self.optimize_lazy_move(&mut commands[start..i]);
-                start = i + 1;
-            }
+    pub fn optimize(&mut self, commands: Vec<Expr>) -> Vec<Expr> {
+        let mut result = vec![];
 
-            if let Expr::Loop(children) = &mut commands[i] {
-                self.optimize(children);
-                if self.can_convert_to_multiplication(children) {
-                    commands[i] = self.optimize_multiplication(children);
+        let mut start = 0;
+        for c in commands {
+            if let Expr::Loop(children) = c {
+                let children = self.optimize(children);
+                if self.can_convert_to_multiplication(&children) {
+                    let mut children = self.optimize_multiplication(&children);
+                    result.append(&mut children);
+                } else {
+                    self.optimize_lazy_move(&mut result[start..]);
+                    result.push(Expr::Loop(children));
+                    start = result.len();
                 }
+            } else {
+                result.push(c);
             }
         }
-        self.optimize_lazy_move(&mut commands[start..]);
+        self.optimize_lazy_move(&mut result[start..]);
+
+        result
     }
 
     fn can_convert_to_multiplication(&mut self, commands: &[Expr]) -> bool {
@@ -50,18 +56,18 @@ impl Optimizer {
         true
     }
 
-    fn optimize_multiplication(&mut self, commands: &[Expr]) -> Expr {
+    fn optimize_multiplication(&mut self, commands: &[Expr]) -> Vec<Expr> {
         let mut new = vec![];
         for c in commands {
             match c {
                 Expr::Add(count, offset) if *offset != 0 => {
-                    new.push(Expr::Mul(*count, *offset));
+                    new.push(Expr::Mul(*count, *offset, 0));
                 }
                 _ => (),
             }
         }
         new.push(Expr::Clear(0));
-        Expr::Block(new)
+        new
     }
 
     fn optimize_lazy_move(&mut self, commands: &mut [Expr]) {
@@ -89,6 +95,10 @@ impl Optimizer {
                     commands[j] = Expr::Clear(current_offset + offset);
                     j += 1;
                 }
+                Expr::Mul(count, index, offset) => {
+                    commands[j] = Expr::Mul(*count, *index, current_offset + offset);
+                    j += 1;
+                }
                 Expr::Nop => {}
                 _ => panic!("optimize_lazy_move meets an unsupported command"),
             }
@@ -107,7 +117,8 @@ impl Optimizer {
 
 #[test]
 fn test_put_h_optimize() {
-    let mut commands = vec![
+    // putchar('H');
+    let commands = vec![
         Expr::Move(1),
         Expr::Add(9, 0),
         Expr::Loop(vec![
@@ -121,14 +132,15 @@ fn test_put_h_optimize() {
     ];
 
     let mut optimizer = Optimizer::new();
-    optimizer.optimize(&mut commands);
+    let commands = optimizer.optimize(commands);
 
     let expected = vec![
         Expr::Add(9, 1),
-        Expr::Move(1),
-        Expr::Block(vec![Expr::Mul(8, -1), Expr::Clear(0)]),
-        Expr::Out(-1),
-        Expr::Move(-1),
+        Expr::Mul(8, -1, 1),
+        Expr::Clear(1),
+        Expr::Out(0),
+        Expr::Nop,
+        Expr::Nop,
     ];
 
     assert_eq!(commands, expected);

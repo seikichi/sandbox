@@ -31,9 +31,9 @@ impl JIT {
     }
 
     pub fn compile(&mut self, input: &str) -> Result<*const u8, String> {
-        let mut commands = parser::program(&input).unwrap();
+        let commands = parser::program(&input).unwrap();
         let mut optimizer = Optimizer::new();
-        optimizer.optimize(&mut commands);
+        let commands = optimizer.optimize(commands);
 
         self.initialize_memory();
         self.translate(&commands).unwrap();
@@ -182,15 +182,12 @@ impl<'a> FunctionTranslator<'a> {
                     self.builder.seal_block(header_block);
                     self.builder.seal_block(exit_block);
                 }
-                Expr::Block(commands) => {
-                    self.translate(commands);
-                }
-                Expr::Mul(count, offset) => {
-                    let p1 = self.address(0);
+                Expr::Mul(count, index, offset) => {
+                    let p1 = self.address(*offset);
                     let v1 = self.builder.ins().load(types::I32, MemFlags::new(), p1, 0);
                     let m = self.builder.ins().imul_imm(v1, i64::from(*count));
 
-                    let p2 = self.address(*offset);
+                    let p2 = self.address(*index + *offset);
                     let v2 = self.builder.ins().load(types::I32, MemFlags::new(), p2, 0);
                     let s = self.builder.ins().iadd(v2, m);
                     self.builder.ins().store(MemFlags::new(), s, p2, 0);
