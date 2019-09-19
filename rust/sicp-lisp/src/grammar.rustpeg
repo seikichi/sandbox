@@ -1,0 +1,32 @@
+use super::Sexp;
+
+pub expressions -> Vec<Sexp>
+  = es:(space* e:(pair / list) { e })+ { es }
+
+pub expression -> Sexp
+  = space* e:nil     { e }
+  / space* e:pair    { e }
+  / space* e:list    { e }
+  / space* e:integer { e }
+  / space* e:symbol  { e }
+
+nil -> Sexp
+  = "nil" { Sexp::Nil }
+
+pair -> Sexp
+  = "(" space* left:expression space+ "." space+ right:expression space* ")" {
+    Sexp::Pair(Box::new(left), Box::new(right))
+  }
+
+list -> Sexp
+  = "(" elems:((space* e:expression { e }) ** space) space* ")" {
+    elems.into_iter().rev().fold(Sexp::Nil, |cdr, car| Sexp::Pair(Box::new(car), Box::new(cdr)))
+  }
+
+integer -> Sexp
+  = n:$([0-9]+) { Sexp::Integer(n.parse().unwrap()) }
+
+symbol -> Sexp
+  = n:$([a-zA-Z+\-*/@$%^&_=<>~.]+) { Sexp::Symbol(n.to_owned()) }
+
+space = [ \t\n]
