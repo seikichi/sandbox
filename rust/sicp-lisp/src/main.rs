@@ -27,8 +27,8 @@ impl fmt::Debug for Value {
             Value::Symbol(s) => write!(f, "{}", s),
             Value::Integer(n) => write!(f, "{}", n),
             Value::Pair(car, cdr) => write!(f, "({:?}, {:?})", car, cdr),
-            Value::PrimitiveProcedure(_) => write!(f, "[primitive-procedure]"),
-            Value::CompoundProcedure { .. } => write!(f, "[compound-procedure]"),
+            Value::PrimitiveProcedure(_) => write!(f, "#<primitive procedure>"),
+            Value::CompoundProcedure { .. } => write!(f, "#<procedure>"),
         }
     }
 }
@@ -60,10 +60,40 @@ fn eval(exp: &Sexp, env: Rc<Environment>) -> Rc<Value> {
         return env.lookup(s);
     }
     if let Sexp::Pair(operator, operands) = exp {
-        return apply(
-            eval(operator, env.clone()),
-            &list_of_values(operands, env.clone()),
-        );
+        match &**operator {
+            Sexp::Symbol(s) if s == "lambda" => {
+                if let Sexp::Pair(p, b) = &**operands {
+                    let mut parameters = vec![];
+
+                    let mut next = &**p;
+                    while let Sexp::Pair(car, cdr) = next {
+                        if let Sexp::Symbol(s) = &**car {
+                            parameters.push(s.clone());
+                        }
+                        next = cdr;
+                    }
+
+                    let mut body = vec![];
+                    let mut next = &**b;
+                    while let Sexp::Pair(car, cdr) = next {
+                        body.push(*car.clone());
+                        next = cdr;
+                    }
+
+                    return Rc::new(Value::CompoundProcedure {
+                        body,
+                        parameters,
+                        environment: env.clone(),
+                    });
+                }
+            }
+            _ => {
+                return apply(
+                    eval(operator, env.clone()),
+                    &list_of_values(operands, env.clone()),
+                );
+            }
+        }
     }
     panic!("Unknown expression type -- EVAL {:?}", exp);
 }
@@ -81,6 +111,33 @@ fn list_of_values(exps: &Sexp, env: Rc<Environment>) -> Vec<Rc<Value>> {
 fn apply(procedure: Rc<Value>, arguments: &[Rc<Value>]) -> Rc<Value> {
     match &*procedure {
         Value::PrimitiveProcedure(f) => Rc::new(f(arguments)),
+        Value::CompoundProcedure {
+            parameters,
+            body,
+            environment,
+        } => {
+            if arguments.len() < parameters.len() {
+                panic!("Too few arguments supplied");
+            }
+            if arguments.len() > parameters.len() {
+                panic!("Too many arguments supplied");
+            }
+
+            let mut variables = HashMap::new();
+            for (param, arg) in parameters.iter().zip(arguments.iter()) {
+                variables.insert(param.clone(), arg.clone());
+            }
+
+            let env = Rc::new(Environment {
+                variables: RefCell::new(variables),
+                base: Some(environment.clone()),
+            });
+            let mut result = Rc::new(Value::Nil);
+            for b in body {
+                result = eval(b, env.clone());
+            }
+            result
+        }
         _ => panic!("Invalid procedure: {:?}", procedure),
     }
 }
@@ -107,7 +164,8 @@ fn main() {
         base: None,
     });
 
-    let source = "(+ 1 (+ 2 3 4))";
+    // let source = "(+ 1 (+ 2 3 4))";
+    let source = "((lambda (x y) (+ x y)) 40 2)";
     let sexp = parser::expression(source).unwrap();
     println!("{:?}", eval(&sexp, env));
 }
