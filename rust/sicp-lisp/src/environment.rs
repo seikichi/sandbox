@@ -153,6 +153,73 @@ impl Environment {
             Rc::new(Value::Nil)
         });
 
+        env.define_primitive_procedure("<", box |args| {
+            if args.len() != 2 {
+                panic!("Invalid arguments for <: {:?}", args);
+            }
+            if let (Value::Integer(lhs), Value::Integer(rhs)) = (&*args[0], &*args[1]) {
+                let b = if lhs < rhs { "true" } else { "false" };
+                return Rc::new(Value::Symbol(b.to_string()));
+            }
+            panic!("Invalid arguments for <: {:?}", args);
+        });
+
+        env.define_primitive_procedure(">", box |args| {
+            if args.len() != 2 {
+                panic!("Invalid arguments for >: {:?}", args);
+            }
+            if let (Value::Integer(lhs), Value::Integer(rhs)) = (&*args[0], &*args[1]) {
+                let b = if lhs > rhs { "true" } else { "false" };
+                return Rc::new(Value::Symbol(b.to_string()));
+            }
+            panic!("Invalid arguments for >: {:?}", args);
+        });
+
+        env.define_primitive_procedure("=", box |args| {
+            if args.len() != 2 {
+                panic!("Invalid arguments for =: {:?}", args);
+            }
+            if let (Value::Integer(lhs), Value::Integer(rhs)) = (&*args[0], &*args[1]) {
+                let b = if lhs == rhs { "true" } else { "false" };
+                return Rc::new(Value::Symbol(b.to_string()));
+            }
+            panic!("Invalid arguments for =: {:?}", args);
+        });
+
+        env.define_primitive_procedure("<=", box |args| {
+            if args.len() != 2 {
+                panic!("Invalid arguments for <=: {:?}", args);
+            }
+            if let (Value::Integer(lhs), Value::Integer(rhs)) = (&*args[0], &*args[1]) {
+                let b = if lhs <= rhs { "true" } else { "false" };
+                return Rc::new(Value::Symbol(b.to_string()));
+            }
+            panic!("Invalid arguments for <=: {:?}", args);
+        });
+
+        env.define_primitive_procedure(">=", box |args| {
+            if args.len() != 2 {
+                panic!("Invalid arguments for >=: {:?}", args);
+            }
+            if let (Value::Integer(lhs), Value::Integer(rhs)) = (&*args[0], &*args[1]) {
+                let b = if lhs >= rhs { "true" } else { "false" };
+                return Rc::new(Value::Symbol(b.to_string()));
+            }
+            panic!("Invalid arguments for >=: {:?}", args);
+        });
+
+        env.define_primitive_procedure("null?", box |args| {
+            if args.len() != 1 {
+                panic!("Invalid arguments for display: {:?}", args);
+            }
+            let b = if let Value::Nil = &*args[0] {
+                "true"
+            } else {
+                "false"
+            };
+            Rc::new(Value::Symbol(b.to_string()))
+        });
+
         env
     }
 

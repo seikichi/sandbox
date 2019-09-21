@@ -23,6 +23,10 @@ pub fn eval(exp: &Sexp, env: &Rc<Environment>) -> Rc<Value> {
             env.define(&var, eval(val, env));
             Rc::new(Value::Symbol("ok".to_string()))
         }
+        Sexp::Pair(
+            box Sexp::Symbol(s),
+            box Sexp::Pair(box p, box Sexp::Pair(box c, box Sexp::Pair(box a, box Sexp::Nil))),
+        ) if s == "if" => eval(if is_true(&eval(p, env)) { c } else { a }, env),
         Sexp::Pair(box Sexp::Symbol(s), box actions) if s == "begin" => eval_sequence(actions, env),
         Sexp::Pair(box Sexp::Symbol(s), box Sexp::Pair(p, b)) if s == "lambda" => {
             let mut parameters = vec![];
@@ -51,7 +55,18 @@ pub fn eval(exp: &Sexp, env: &Rc<Environment>) -> Rc<Value> {
         Sexp::Pair(operator, operands) => {
             apply(eval(operator, env), &list_of_values(operands, env))
         }
-        _ => panic!("Unknown expression type -- EVAL {:?}", exp),
+    }
+}
+
+fn is_true(exp: &Rc<Value>) -> bool {
+    !is_false(exp)
+}
+
+fn is_false(exp: &Rc<Value>) -> bool {
+    if let Value::Symbol(s) = &**exp {
+        s == "false"
+    } else {
+        false
     }
 }
 

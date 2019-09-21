@@ -25,10 +25,24 @@ fn main() {
 (display (c2))
 (display (c2))
 
-(define s1 (cons 1 (cons 2 nil)))
+(define factorial
+  (lambda (n)
+    (if (= n 0)
+        1
+        (* n (factorial (- n 1))))))
+(display (factorial 5))
+
+(define s1 (cons 1 (cons 2 (cons 3 (cons 4 nil)))))
 (display s1)
 (display (car s1))
 (display (cdr s1))
+
+(define sum
+  (lambda (s)
+    (if (null? s)
+        0
+        (+ (car s) (sum (cdr s))))))
+(display (sum s1))
 ";
 
     for e in &parser::expressions(s).unwrap() {

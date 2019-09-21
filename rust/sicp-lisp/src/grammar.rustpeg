@@ -27,6 +27,6 @@ integer -> Sexp
   = n:$([0-9]+) { Sexp::Integer(n.parse().unwrap()) }
 
 symbol -> Sexp
-  = n:$([a-zA-Z1-9+\-*/@$%^&_=<>~.!]+) { Sexp::Symbol(n.to_owned()) }
+  = n:$([a-zA-Z0-9+\-*/@$%^&_=<>~.!?]+) { Sexp::Symbol(n.to_owned()) }
 
 space = [ \t\n]
