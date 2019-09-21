@@ -7,8 +7,8 @@ pub enum Value {
     Nil,
     Symbol(String),
     Integer(u64),
-    Pair(Box<Value>, Box<Value>),
-    PrimitiveProcedure(Box<dyn Fn(&[Rc<Value>]) -> Value>),
+    Pair(Rc<Value>, Rc<Value>),
+    PrimitiveProcedure(Box<dyn Fn(&[Rc<Value>]) -> Rc<Value>>),
     CompoundProcedure {
         body: Vec<Sexp>,
         parameters: Vec<String>,
