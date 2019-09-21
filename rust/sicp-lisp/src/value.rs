@@ -1,0 +1,30 @@
+use super::environment::*;
+use super::sexp::*;
+use std::fmt;
+use std::rc::Rc;
+
+pub enum Value {
+    Nil,
+    Symbol(String),
+    Integer(u64),
+    Pair(Box<Value>, Box<Value>),
+    PrimitiveProcedure(Box<dyn Fn(&[Rc<Value>]) -> Value>),
+    CompoundProcedure {
+        body: Vec<Sexp>,
+        parameters: Vec<String>,
+        environment: Rc<Environment>,
+    },
+}
+
+impl fmt::Debug for Value {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Value::Nil => write!(f, "nil"),
+            Value::Symbol(s) => write!(f, "{}", s),
+            Value::Integer(n) => write!(f, "{}", n),
+            Value::Pair(car, cdr) => write!(f, "({:?}, {:?})", car, cdr),
+            Value::PrimitiveProcedure(_) => write!(f, "#<primitive procedure>"),
+            Value::CompoundProcedure { .. } => write!(f, "#<procedure>"),
+        }
+    }
+}

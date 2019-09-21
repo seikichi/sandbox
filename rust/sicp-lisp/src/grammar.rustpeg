@@ -1,7 +1,7 @@
 use super::Sexp;
 
 pub expressions -> Vec<Sexp>
-  = es:(space* e:(pair / list) { e })+ { es }
+  = es:(e:expression+ space* { e }) { es }
 
 pub expression -> Sexp
   = space* e:nil     { e }
@@ -27,6 +27,6 @@ integer -> Sexp
   = n:$([0-9]+) { Sexp::Integer(n.parse().unwrap()) }
 
 symbol -> Sexp
-  = n:$([a-zA-Z+\-*/@$%^&_=<>~.]+) { Sexp::Symbol(n.to_owned()) }
+  = n:$([a-zA-Z1-9+\-*/@$%^&_=<>~.!]+) { Sexp::Symbol(n.to_owned()) }
 
 space = [ \t\n]

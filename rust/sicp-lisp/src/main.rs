@@ -1,108 +1,80 @@
-mod sexp;
+#![feature(box_syntax, box_patterns)]
 
-use std::cell::RefCell;
-use std::collections::hash_map::HashMap;
-use std::fmt;
+mod environment;
+mod sexp;
+mod value;
+
 use std::rc::Rc;
 
+use environment::*;
 use sexp::*;
+use value::*;
 
-enum Value {
-    Nil,
-    Symbol(String),
-    Integer(u64),
-    Pair(Box<Value>, Box<Value>),
-    PrimitiveProcedure(Box<dyn Fn(&[Rc<Value>]) -> Value>),
-    CompoundProcedure {
-        body: Vec<Sexp>,
-        parameters: Vec<String>,
-        environment: Rc<Environment>,
-    },
-}
-
-impl fmt::Debug for Value {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Value::Nil => write!(f, "nil"),
-            Value::Symbol(s) => write!(f, "{}", s),
-            Value::Integer(n) => write!(f, "{}", n),
-            Value::Pair(car, cdr) => write!(f, "({:?}, {:?})", car, cdr),
-            Value::PrimitiveProcedure(_) => write!(f, "#<primitive procedure>"),
-            Value::CompoundProcedure { .. } => write!(f, "#<procedure>"),
+fn eval(exp: &Sexp, env: &Rc<Environment>) -> Rc<Value> {
+    match exp {
+        Sexp::Integer(n) => Rc::new(Value::Integer(*n)),
+        Sexp::Symbol(s) => env.lookup(s),
+        Sexp::Pair(
+            box Sexp::Symbol(s),
+            box Sexp::Pair(box Sexp::Symbol(var), box Sexp::Pair(box val, box Sexp::Nil)),
+        ) if s == "set!" => {
+            env.set(&var, eval(val, env));
+            Rc::new(Value::Symbol("ok".to_string()))
         }
-    }
-}
-
-#[derive(Debug)]
-struct Environment {
-    variables: RefCell<HashMap<String, Rc<Value>>>,
-    base: Option<Rc<Environment>>,
-}
-
-impl Environment {
-    pub fn lookup(&self, var: &str) -> Rc<Value> {
-        let variables = self.variables.borrow();
-        if let Some(value) = variables.get(var) {
-            return value.clone();
+        Sexp::Pair(
+            box Sexp::Symbol(s),
+            box Sexp::Pair(box Sexp::Symbol(var), box Sexp::Pair(box val, box Sexp::Nil)),
+        ) if s == "define" => {
+            env.define(&var, eval(val, env));
+            Rc::new(Value::Symbol("ok".to_string()))
         }
-        if let Some(base) = &self.base {
-            return base.lookup(var);
-        }
-        panic!("Unbound variable: {}", var);
-    }
-}
+        Sexp::Pair(box Sexp::Symbol(s), box actions) if s == "begin" => eval_sequence(actions, env),
+        Sexp::Pair(box Sexp::Symbol(s), box Sexp::Pair(p, b)) if s == "lambda" => {
+            let mut parameters = vec![];
 
-fn eval(exp: &Sexp, env: Rc<Environment>) -> Rc<Value> {
-    if let Sexp::Integer(n) = exp {
-        return Rc::new(Value::Integer(*n));
-    }
-    if let Sexp::Symbol(s) = exp {
-        return env.lookup(s);
-    }
-    if let Sexp::Pair(operator, operands) = exp {
-        match &**operator {
-            Sexp::Symbol(s) if s == "lambda" => {
-                if let Sexp::Pair(p, b) = &**operands {
-                    let mut parameters = vec![];
-
-                    let mut next = &**p;
-                    while let Sexp::Pair(car, cdr) = next {
-                        if let Sexp::Symbol(s) = &**car {
-                            parameters.push(s.clone());
-                        }
-                        next = cdr;
-                    }
-
-                    let mut body = vec![];
-                    let mut next = &**b;
-                    while let Sexp::Pair(car, cdr) = next {
-                        body.push(*car.clone());
-                        next = cdr;
-                    }
-
-                    return Rc::new(Value::CompoundProcedure {
-                        body,
-                        parameters,
-                        environment: env.clone(),
-                    });
+            let mut next = &**p;
+            while let Sexp::Pair(car, cdr) = next {
+                if let Sexp::Symbol(s) = &**car {
+                    parameters.push(s.clone());
                 }
+                next = cdr;
             }
-            _ => {
-                return apply(
-                    eval(operator, env.clone()),
-                    &list_of_values(operands, env.clone()),
-                );
+
+            let mut body = vec![];
+            let mut next = &**b;
+            while let Sexp::Pair(car, cdr) = next {
+                body.push(*car.clone());
+                next = cdr;
             }
+
+            Rc::new(Value::CompoundProcedure {
+                body,
+                parameters,
+                environment: env.clone(),
+            })
         }
+        Sexp::Pair(operator, operands) => {
+            apply(eval(operator, env), &list_of_values(operands, env))
+        }
+        _ => panic!("Unknown expression type -- EVAL {:?}", exp),
     }
-    panic!("Unknown expression type -- EVAL {:?}", exp);
 }
 
-fn list_of_values(exps: &Sexp, env: Rc<Environment>) -> Vec<Rc<Value>> {
+fn eval_sequence(exp: &Sexp, env: &Rc<Environment>) -> Rc<Value> {
+    let mut result = Rc::new(Value::Nil);
+    let mut p = exp;
+    while let Sexp::Pair(car, cdr) = p {
+        result = eval(car, env);
+        p = cdr;
+    }
+    result
+}
+
+fn list_of_values(exps: &Sexp, env: &Rc<Environment>) -> Vec<Rc<Value>> {
     let mut values = vec![];
     let mut p = exps;
     while let Sexp::Pair(car, cdr) = p {
-        values.push(eval(car, env.clone()));
+        values.push(eval(car, env));
         p = cdr;
     }
     values
@@ -116,25 +88,10 @@ fn apply(procedure: Rc<Value>, arguments: &[Rc<Value>]) -> Rc<Value> {
             body,
             environment,
         } => {
-            if arguments.len() < parameters.len() {
-                panic!("Too few arguments supplied");
-            }
-            if arguments.len() > parameters.len() {
-                panic!("Too many arguments supplied");
-            }
-
-            let mut variables = HashMap::new();
-            for (param, arg) in parameters.iter().zip(arguments.iter()) {
-                variables.insert(param.clone(), arg.clone());
-            }
-
-            let env = Rc::new(Environment {
-                variables: RefCell::new(variables),
-                base: Some(environment.clone()),
-            });
+            let env = Environment::extend(&parameters, arguments, &environment);
             let mut result = Rc::new(Value::Nil);
             for b in body {
-                result = eval(b, env.clone());
+                result = eval(b, &env);
             }
             result
         }
@@ -143,29 +100,48 @@ fn apply(procedure: Rc<Value>, arguments: &[Rc<Value>]) -> Rc<Value> {
 }
 
 fn main() {
-    let mut variables = HashMap::new();
-    variables.insert(
-        "+".to_string(),
+    let env = Environment::empty();
+    env.define(
+        "+",
         Rc::new(Value::PrimitiveProcedure(Box::new(|args| {
             let mut result = 0;
-            for i in 0..args.len() {
-                if let Value::Integer(n) = &*args[i] {
+            for arg in args {
+                if let Value::Integer(n) = &**arg {
                     result += *n;
                 } else {
-                    panic!("Invalid arguments for +: {:?}", args[i]);
+                    panic!("Invalid arguments for +: {:?}", arg);
                 }
             }
             Value::Integer(result)
         }))),
     );
 
-    let env = Rc::new(Environment {
-        variables: RefCell::new(variables),
-        base: None,
-    });
+    env.define(
+        "display",
+        Rc::new(Value::PrimitiveProcedure(Box::new(|args| {
+            if args.len() != 1 {
+                panic!("Invalid arguments for display: {:?}", args);
+            }
+            println!("{:?}", args[0]);
+            Value::Nil
+        }))),
+    );
 
-    // let source = "(+ 1 (+ 2 3 4))";
-    let source = "((lambda (x y) (+ x y)) 40 2)";
-    let sexp = parser::expression(source).unwrap();
-    println!("{:?}", eval(&sexp, env));
+    let s = "
+(define double (lambda (x) (+ x x)))
+(display (double 21))
+
+(define make-counter (lambda () (begin (define count 0) (lambda () (begin (set! count (+ count 1)) count)))))
+(define c1 (make-counter))
+(define c2 (make-counter))
+(display (c1))
+(display (c1))
+(display (c1))
+(display (c2))
+(display (c2))
+";
+
+    for e in &parser::expressions(s).unwrap() {
+        eval(e, &env);
+    }
 }
