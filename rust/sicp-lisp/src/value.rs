@@ -6,7 +6,7 @@ use std::rc::Rc;
 pub enum Value {
     Nil,
     Symbol(String),
-    Integer(u64),
+    Integer(i64),
     Pair(Rc<Value>, Rc<Value>),
     PrimitiveProcedure(Box<dyn Fn(&[Rc<Value>]) -> Rc<Value>>),
     CompoundProcedure {
@@ -22,7 +22,7 @@ impl fmt::Debug for Value {
             Value::Nil => write!(f, "nil"),
             Value::Symbol(s) => write!(f, "{}", s),
             Value::Integer(n) => write!(f, "{}", n),
-            Value::Pair(car, cdr) => write!(f, "({:?}, {:?})", car, cdr),
+            Value::Pair(car, cdr) => write!(f, "({:?} . {:?})", car, cdr),
             Value::PrimitiveProcedure(_) => write!(f, "#<primitive procedure>"),
             Value::CompoundProcedure { .. } => write!(f, "#<procedure>"),
         }

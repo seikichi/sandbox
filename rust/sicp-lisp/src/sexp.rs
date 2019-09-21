@@ -1,7 +1,7 @@
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Sexp {
     Nil,
-    Integer(u64),
+    Integer(i64),
     Symbol(String),
     Pair(Box<Sexp>, Box<Sexp>),
 }
