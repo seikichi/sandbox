@@ -28,3 +28,17 @@ impl fmt::Debug for Value {
         }
     }
 }
+
+impl Value {
+    pub fn ok() -> Rc<Self> {
+        Rc::new(Value::Symbol("ok".to_string()))
+    }
+
+    pub fn t() -> Rc<Self> {
+        Rc::new(Value::Symbol("true".to_string()))
+    }
+
+    pub fn f() -> Rc<Self> {
+        Rc::new(Value::Symbol("false".to_string()))
+    }
+}

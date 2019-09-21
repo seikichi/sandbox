@@ -4,57 +4,31 @@ use super::environment::*;
 use super::sexp::*;
 use super::value::*;
 
+use super::sexp::Sexp::*;
+
 pub fn eval(exp: &Sexp, env: &Rc<Environment>) -> Rc<Value> {
     match exp {
-        Sexp::Nil => Rc::new(Value::Nil),
-        Sexp::Integer(n) => Rc::new(Value::Integer(*n)),
-        Sexp::Symbol(s) => env.lookup(s),
-        Sexp::Pair(
-            box Sexp::Symbol(s),
-            box Sexp::Pair(box Sexp::Symbol(var), box Sexp::Pair(box val, box Sexp::Nil)),
-        ) if s == "set!" => {
-            env.set(&var, eval(val, env));
-            Rc::new(Value::Symbol("ok".to_string()))
+        Nil => Rc::new(Value::Nil),
+        Integer(n) => Rc::new(Value::Integer(*n)),
+        Symbol(s) => env.lookup(s),
+        Pair(box Symbol(tag), box Pair(box Symbol(var), box Pair(box val, box Nil)))
+            if tag == "set!" =>
+        {
+            env.set(&var, eval(val, env))
         }
-        Sexp::Pair(
-            box Sexp::Symbol(s),
-            box Sexp::Pair(box Sexp::Symbol(var), box Sexp::Pair(box val, box Sexp::Nil)),
-        ) if s == "define" => {
-            env.define(&var, eval(val, env));
-            Rc::new(Value::Symbol("ok".to_string()))
+        Pair(box Symbol(tag), box Pair(box Symbol(var), box Pair(box val, box Nil)))
+            if tag == "define" =>
+        {
+            env.define(&var, eval(val, env))
         }
-        Sexp::Pair(
-            box Sexp::Symbol(s),
-            box Sexp::Pair(box p, box Sexp::Pair(box c, box Sexp::Pair(box a, box Sexp::Nil))),
-        ) if s == "if" => eval(if is_true(&eval(p, env)) { c } else { a }, env),
-        Sexp::Pair(box Sexp::Symbol(s), box actions) if s == "begin" => eval_sequence(actions, env),
-        Sexp::Pair(box Sexp::Symbol(s), box Sexp::Pair(p, b)) if s == "lambda" => {
-            let mut parameters = vec![];
-
-            let mut next = &**p;
-            while let Sexp::Pair(car, cdr) = next {
-                if let Sexp::Symbol(s) = &**car {
-                    parameters.push(s.clone());
-                }
-                next = cdr;
-            }
-
-            let mut body = vec![];
-            let mut next = &**b;
-            while let Sexp::Pair(car, cdr) = next {
-                body.push(*car.clone());
-                next = cdr;
-            }
-
-            Rc::new(Value::CompoundProcedure {
-                body,
-                parameters,
-                environment: env.clone(),
-            })
+        Pair(box Symbol(tag), box Pair(box p, box Pair(box c, box Pair(box a, box Nil))))
+            if tag == "if" =>
+        {
+            eval(if is_true(&eval(p, env)) { c } else { a }, env)
         }
-        Sexp::Pair(operator, operands) => {
-            apply(eval(operator, env), &list_of_values(operands, env))
-        }
+        Pair(box Symbol(tag), box actions) if tag == "begin" => eval_sequence(actions, env),
+        Pair(box Symbol(tag), box Pair(box p, box b)) if tag == "lambda" => eval_lambda(p, b, env),
+        Pair(operator, operands) => apply(eval(operator, env), &list_of_values(operands, env)),
     }
 }
 
@@ -70,10 +44,35 @@ fn is_false(exp: &Rc<Value>) -> bool {
     }
 }
 
+fn eval_lambda(p: &Sexp, b: &Sexp, env: &Rc<Environment>) -> Rc<Value> {
+    let mut parameters = vec![];
+
+    let mut next = &*p;
+    while let Pair(car, cdr) = next {
+        if let Symbol(s) = &**car {
+            parameters.push(s.clone());
+        }
+        next = cdr;
+    }
+
+    let mut body = vec![];
+    let mut next = &*b;
+    while let Pair(car, cdr) = next {
+        body.push(*car.clone());
+        next = cdr;
+    }
+
+    Rc::new(Value::CompoundProcedure {
+        body,
+        parameters,
+        environment: env.clone(),
+    })
+}
+
 fn eval_sequence(exp: &Sexp, env: &Rc<Environment>) -> Rc<Value> {
     let mut result = Rc::new(Value::Nil);
     let mut p = exp;
-    while let Sexp::Pair(car, cdr) = p {
+    while let Pair(car, cdr) = p {
         result = eval(car, env);
         p = cdr;
     }
@@ -83,7 +82,7 @@ fn eval_sequence(exp: &Sexp, env: &Rc<Environment>) -> Rc<Value> {
 fn list_of_values(exps: &Sexp, env: &Rc<Environment>) -> Vec<Rc<Value>> {
     let mut values = vec![];
     let mut p = exps;
-    while let Sexp::Pair(car, cdr) = p {
+    while let Pair(car, cdr) = p {
         values.push(eval(car, env));
         p = cdr;
     }

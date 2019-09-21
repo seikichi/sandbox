@@ -18,12 +18,13 @@ impl Environment {
         })
     }
 
-    pub fn define(&self, var: &str, value: Rc<Value>) {
+    pub fn define(&self, var: &str, value: Rc<Value>) -> Rc<Value> {
         let mut variables = self.variables.borrow_mut();
         variables.insert(var.to_string(), value);
+        Value::ok()
     }
 
-    pub fn set(&self, var: &str, value: Rc<Value>) {
+    pub fn set(&self, var: &str, value: Rc<Value>) -> Rc<Value> {
         let mut variables = self.variables.borrow_mut();
         if variables.contains_key(var) {
             variables.insert(var.to_string(), value);
@@ -32,6 +33,7 @@ impl Environment {
         } else {
             panic!("Unbound variable: {}", var);
         }
+        Value::ok()
     }
 
     pub fn extend(vars: &[String], vals: &[Rc<Value>], base: &Rc<Environment>) -> Rc<Self> {
@@ -158,8 +160,7 @@ impl Environment {
                 panic!("Invalid arguments for <: {:?}", args);
             }
             if let (Value::Integer(lhs), Value::Integer(rhs)) = (&*args[0], &*args[1]) {
-                let b = if lhs < rhs { "true" } else { "false" };
-                return Rc::new(Value::Symbol(b.to_string()));
+                return if lhs < rhs { Value::t() } else { Value::f() };
             }
             panic!("Invalid arguments for <: {:?}", args);
         });
@@ -169,8 +170,7 @@ impl Environment {
                 panic!("Invalid arguments for >: {:?}", args);
             }
             if let (Value::Integer(lhs), Value::Integer(rhs)) = (&*args[0], &*args[1]) {
-                let b = if lhs > rhs { "true" } else { "false" };
-                return Rc::new(Value::Symbol(b.to_string()));
+                return if lhs > rhs { Value::t() } else { Value::f() };
             }
             panic!("Invalid arguments for >: {:?}", args);
         });
@@ -180,8 +180,7 @@ impl Environment {
                 panic!("Invalid arguments for =: {:?}", args);
             }
             if let (Value::Integer(lhs), Value::Integer(rhs)) = (&*args[0], &*args[1]) {
-                let b = if lhs == rhs { "true" } else { "false" };
-                return Rc::new(Value::Symbol(b.to_string()));
+                return if lhs == rhs { Value::t() } else { Value::f() };
             }
             panic!("Invalid arguments for =: {:?}", args);
         });
@@ -191,8 +190,7 @@ impl Environment {
                 panic!("Invalid arguments for <=: {:?}", args);
             }
             if let (Value::Integer(lhs), Value::Integer(rhs)) = (&*args[0], &*args[1]) {
-                let b = if lhs <= rhs { "true" } else { "false" };
-                return Rc::new(Value::Symbol(b.to_string()));
+                return if lhs <= rhs { Value::t() } else { Value::f() };
             }
             panic!("Invalid arguments for <=: {:?}", args);
         });
@@ -202,8 +200,7 @@ impl Environment {
                 panic!("Invalid arguments for >=: {:?}", args);
             }
             if let (Value::Integer(lhs), Value::Integer(rhs)) = (&*args[0], &*args[1]) {
-                let b = if lhs >= rhs { "true" } else { "false" };
-                return Rc::new(Value::Symbol(b.to_string()));
+                return if lhs >= rhs { Value::t() } else { Value::f() };
             }
             panic!("Invalid arguments for >=: {:?}", args);
         });
@@ -212,12 +209,11 @@ impl Environment {
             if args.len() != 1 {
                 panic!("Invalid arguments for display: {:?}", args);
             }
-            let b = if let Value::Nil = &*args[0] {
-                "true"
+            if let Value::Nil = &*args[0] {
+                Value::t()
             } else {
-                "false"
-            };
-            Rc::new(Value::Symbol(b.to_string()))
+                Value::f()
+            }
         });
 
         env
