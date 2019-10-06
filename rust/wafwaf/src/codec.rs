@@ -1,12 +1,11 @@
 use bytes::BytesMut;
 use http::{header::HeaderValue, Request, Response};
+
 use std::{fmt, io};
 use tokio::codec::{Decoder, Encoder};
 
 pub struct Http;
 
-/// Implementation of encoding an HTTP response into a `BytesMut`, basically
-/// just writing out an HTTP/1.1 response.
 impl Encoder for Http {
     type Item = Response<String>;
     type Error = io::Error;
@@ -40,9 +39,6 @@ impl Encoder for Http {
 
         return Ok(());
 
-        // Right now `write!` on `Vec<u8>` goes through io::Write and is not
-        // super speedy, so inline a less-crufty implementation here which
-        // doesn't go through io::Error.
         struct BytesWrite<'a>(&'a mut BytesMut);
 
         impl fmt::Write for BytesWrite<'_> {
@@ -58,17 +54,11 @@ impl Encoder for Http {
     }
 }
 
-/// Implementation of decoding an HTTP request from the bytes we've read so far.
-/// This leverages the `httparse` crate to do the actual parsing and then we use
-/// that information to construct an instance of a `http::Request` object,
-/// trying to avoid allocations where possible.
 impl Decoder for Http {
     type Item = Request<()>;
     type Error = io::Error;
 
     fn decode(&mut self, src: &mut BytesMut) -> io::Result<Option<Request<()>>> {
-        // TODO: we should grow this headers array if parsing fails and asks
-        //       for more headers
         let mut headers = [None; 16];
         let (method, path, version, amt) = {
             let mut parsed_headers = [httparse::EMPTY_HEADER; 16];
@@ -138,28 +128,9 @@ mod date {
 
     pub struct Now(());
 
-    /// Returns a struct, which when formatted, renders an appropriate `Date`
-    /// header value.
     pub fn now() -> Now {
         Now(())
     }
-
-    // Gee Alex, doesn't this seem like premature optimization. Well you see
-    // there Billy, you're absolutely correct! If your server is *bottlenecked*
-    // on rendering the `Date` header, well then boy do I have news for you, you
-    // don't need this optimization.
-    //
-    // In all seriousness, though, a simple "hello world" benchmark which just
-    // sends back literally "hello world" with standard headers actually is
-    // bottlenecked on rendering a date into a byte buffer. Since it was at the
-    // top of a profile, and this was done for some competitive benchmarks, this
-    // module was written.
-    //
-    // Just to be clear, though, I was not intending on doing this because it
-    // really does seem kinda absurd, but it was done by someone else [1], so I
-    // blame them!  :)
-    //
-    // [1]: https://github.com/rapidoid/rapidoid/blob/f1c55c0555007e986b5d069fe1086e6d09933f7b/rapidoid-commons/src/main/java/org/rapidoid/commons/Dates.java#L48-L66
 
     struct LastRenderedNow {
         bytes: [u8; 128],

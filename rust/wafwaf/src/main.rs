@@ -4,43 +4,70 @@ use codec::Http;
 
 use futures::{SinkExt, StreamExt};
 use http::{Request, Response};
+use path_tree::PathTree;
 use serde::Serialize;
-use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::{env, error::Error};
 use tokio::codec::Framed;
 use tokio::net::TcpListener;
 use tokio::runtime::Runtime;
 
-type Callback = Box<dyn Fn(Request<()>) -> Response<String> + Send + Sync>;
+type Params<'a> = Vec<(&'a str, &'a str)>;
+
+trait Handler: Send + Sync + 'static {
+    fn handle(&self, r: Request<()>, p: Params) -> Result<Response<String>, Box<dyn Error>>;
+}
+
+impl<F> Handler for F
+where
+    F: Send + Sync + 'static + Fn(Request<()>, Params) -> Result<Response<String>, Box<dyn Error>>,
+{
+    fn handle(&self, r: Request<()>, p: Params) -> Result<Response<String>, Box<dyn Error>> {
+        (*self)(r, p)
+    }
+}
 
 struct WafWaf {
-    routes: HashMap<String, Callback>,
+    tree: PathTree<Box<dyn Handler>>,
 }
 
 impl WafWaf {
     fn new() -> Self {
-        Self {
-            routes: HashMap::new(),
-        }
+        let tree = PathTree::new();
+        Self { tree }
     }
 
-    fn get<C: Fn(Request<()>) -> Response<String> + 'static + Send + Sync>(
-        &mut self,
-        url: &str,
-        callback: C,
-    ) {
-        self.routes.insert(url.to_string(), Box::new(callback));
+    fn get<H: Handler>(&mut self, url: &str, handler: H) {
+        let path = format!("/GET/{}", url);
+        self.tree.insert(&path, Box::new(handler));
+    }
+
+    #[allow(dead_code)]
+    fn put<H: Handler>(&mut self, url: &str, handler: H) {
+        let path = format!("/PUT/{}", url);
+        self.tree.insert(&path, Box::new(handler));
+    }
+
+    #[allow(dead_code)]
+    fn post<H: Handler>(&mut self, url: &str, handler: H) {
+        let path = format!("/POST/{}", url);
+        self.tree.insert(&path, Box::new(handler));
+    }
+
+    #[allow(dead_code)]
+    fn delete<H: Handler>(&mut self, url: &str, handler: H) {
+        let path = format!("/DELETE/{}", url);
+        self.tree.insert(&path, Box::new(handler));
     }
 
     fn listen(self, addr: &str) -> Result<(), Box<dyn Error>> {
         let rt = Runtime::new().unwrap();
-        let routes = Arc::new(self.routes);
+        let tree = Arc::new(self.tree);
         rt.block_on(async {
             let mut incoming = TcpListener::bind(&addr).await?.incoming();
 
             while let Some(Ok(stream)) = incoming.next().await {
-                let routes = routes.clone();
+                let tree = tree.clone();
                 tokio::spawn(async move {
                     let mut transport = Framed::new(stream, Http);
 
@@ -48,8 +75,12 @@ impl WafWaf {
                         match request {
                             Ok(request) => {
                                 let response = {
-                                    match routes.get(request.uri().path()) {
-                                        Some(callback) => callback(request),
+                                    let path =
+                                        format!("/{}/{}", request.method(), request.uri().path());
+                                    match tree.find(&path) {
+                                        Some((handler, params)) => {
+                                            handler.handle(request, params).unwrap()
+                                        }
                                         _ => panic!("HAHAHA"),
                                     }
                                 };
@@ -75,25 +106,33 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut wafwaf = WafWaf::new();
 
-    wafwaf.get("/hello", |_req| {
-        let mut response = Response::builder();
-        response.header("Content-Type", "text/plain");
-        response.body("Hello, World!".to_string()).unwrap()
+    let counter = Arc::new(Mutex::new(0));
+
+    wafwaf.get("/counter", move |_req, _params: Params| {
+        let mut counter = counter.lock().unwrap();
+        *counter += 1;
+        Ok(Response::builder()
+            .header("Content-Type", "text/plain")
+            .body(format!("Counter: {}\n", *counter))?)
     });
 
-    wafwaf.get("/json", |_req| {
-        let mut response = Response::builder();
-        response.header("Content-Type", "application/json");
+    wafwaf.get("/hello/:name", |_req, params: Params| {
+        Ok(Response::builder()
+            .header("Content-Type", "text/plain")
+            .body(format!("Hello, {}!\n", params[0].1))?)
+    });
 
+    wafwaf.get("/json", |_req, _params: Params| {
         #[derive(Serialize)]
         struct Message {
             message: &'static str,
         }
         let body = serde_json::to_string(&Message {
             message: "Hello, World!",
-        })
-        .unwrap();
-        response.body(body).unwrap()
+        })?;
+        Ok(Response::builder()
+            .header("Content-Type", "application/json")
+            .body(body)?)
     });
 
     wafwaf.listen(&addr)?;
