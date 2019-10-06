@@ -1,7 +1,6 @@
-use http::Response;
 use std::sync::{Arc, Mutex};
 use std::{env, error::Error};
-use wafwaf::{Params, WafWaf};
+use wafwaf::{Params, Response, WafWaf};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let addr = env::args()

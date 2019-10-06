@@ -4,7 +4,6 @@ use codec::Http;
 use std::error::Error;
 use std::sync::Arc;
 
-use http::{Request, Response};
 use path_tree::PathTree;
 
 use futures::{SinkExt, StreamExt};
@@ -13,6 +12,8 @@ use tokio::{
     net::{TcpListener, TcpStream},
     runtime::Runtime,
 };
+
+pub use http::{Request, Response};
 
 pub type Params<'a> = Vec<(&'a str, &'a str)>;
 

@@ -1,7 +1,6 @@
-use http::Response;
 use serde::Serialize;
 use std::{env, error::Error};
-use wafwaf::{Params, WafWaf};
+use wafwaf::{Params, Response, WafWaf};
 
 #[derive(Serialize)]
 struct Message {
