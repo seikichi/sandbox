@@ -60,7 +60,7 @@ impl Decoder for Http {
 
     fn decode(&mut self, src: &mut BytesMut) -> io::Result<Option<Request<()>>> {
         let mut headers = [None; 16];
-        let (method, path, version, amt) = {
+        let (method, path, amt) = {
             let mut parsed_headers = [httparse::EMPTY_HEADER; 16];
             let mut r = httparse::Request::new(&mut parsed_headers);
             let status = r.parse(src).map_err(|e| {
@@ -88,16 +88,10 @@ impl Decoder for Http {
             (
                 toslice(r.method.unwrap().as_bytes()),
                 toslice(r.path.unwrap().as_bytes()),
-                r.version.unwrap(),
                 amt,
             )
         };
-        if version != 1 {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                "only HTTP/1.1 accepted",
-            ));
-        }
+
         let data = src.split_to(amt).freeze();
         let mut ret = Request::builder();
         ret.method(&data[method.0..method.1]);

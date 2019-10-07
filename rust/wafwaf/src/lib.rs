@@ -86,7 +86,8 @@ impl WafWaf {
     ) -> Result<(), Box<dyn Error>> {
         let mut transport = Framed::new(stream, Http);
 
-        while let Some(request) = transport.next().await {
+        // TODO (seikichi): use while loop instead of if block here
+        if let Some(request) = transport.next().await {
             match request {
                 Ok(request) => {
                     let response = WafWaf::respond(request, tree.clone()).await?;
