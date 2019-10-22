@@ -1,9 +1,9 @@
-mod utils;
+// #![no_std]
+
+const MAX_UNIVERSE_SIZE: usize = 8192;
 
 use wasm_bindgen::prelude::*;
 
-// When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
-// allocator.
 #[cfg(feature = "wee_alloc")]
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
@@ -20,26 +20,29 @@ pub enum Cell {
 pub struct Universe {
     width: u32,
     height: u32,
-    cells: Vec<Cell>,
+    buffers: [[Cell; MAX_UNIVERSE_SIZE]; 2],
+    index: usize,
 }
 
 #[wasm_bindgen]
 impl Universe {
     pub fn new(width: u32, height: u32) -> Universe {
-        let cells = (0..width * height)
-            .map(|i| {
-                if i % 2 == 0 || i % 7 == 0 {
-                    Cell::Alive
-                } else {
-                    Cell::Dead
-                }
-            })
-            .collect();
+        let index = 0;
+        let mut buffers = [[Cell::Dead; MAX_UNIVERSE_SIZE]; 2];
+
+        for i in 0..width * height {
+            buffers[index][i as usize] = if i % 2 == 0 || i % 7 == 0 {
+                Cell::Alive
+            } else {
+                Cell::Dead
+            };
+        }
 
         Universe {
             width,
             height,
-            cells,
+            buffers,
+            index,
         }
     }
 
@@ -52,16 +55,16 @@ impl Universe {
     }
 
     pub fn cells(&self) -> *const Cell {
-        self.cells.as_ptr()
+        self.buffers[self.index].as_ptr()
     }
 
     pub fn tick(&mut self) {
-        let mut next = self.cells.clone();
+        let next = (self.index + 1) % 2;
 
         for row in 0..self.height {
             for col in 0..self.width {
                 let idx = self.get_index(row, col);
-                let cell = self.cells[idx];
+                let cell = self.buffers[self.index][idx];
                 let live_neighbors = self.live_neighbor_count(row, col);
 
                 let next_cell = match (cell, live_neighbors) {
@@ -81,11 +84,11 @@ impl Universe {
                     (otherwise, _) => otherwise,
                 };
 
-                next[idx] = next_cell;
+                self.buffers[next][idx] = next_cell;
             }
         }
 
-        self.cells = next;
+        self.index = next;
     }
 
     fn live_neighbor_count(&self, row: u32, column: u32) -> u8 {
@@ -99,7 +102,7 @@ impl Universe {
                 let neighbor_row = (row + delta_row) % self.height;
                 let neighbor_col = (column + delta_col) % self.width;
                 let idx = self.get_index(neighbor_row, neighbor_col);
-                count += self.cells[idx] as u8;
+                count += self.buffers[self.index][idx] as u8;
             }
         }
         count
