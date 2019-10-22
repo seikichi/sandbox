@@ -12,6 +12,15 @@ const CELL_SIZE = 0.0025; // 0.25cm
 const CELL_LENS = 64; // 64x64
 const CELL_MARGIN = 1.2;
 
+// main
+setTimeout(() => {
+  try {
+    window.pageApp = new ARSimplestExample(document.getElementById("target"));
+  } catch (e) {
+    console.error("page error", e);
+  }
+}, 1000);
+
 class ARSimplestExample extends XRExampleBase {
   constructor(domElement) {
     super(domElement, false);
@@ -91,13 +100,3 @@ class ARSimplestExample extends XRExampleBase {
     ];
   }
 }
-
-document.addEventListener("DOMContentLoaded", () => {
-  setTimeout(() => {
-    try {
-      window.pageApp = new ARSimplestExample(document.getElementById("target"));
-    } catch (e) {
-      console.error("page error", e);
-    }
-  }, 1000);
-});
