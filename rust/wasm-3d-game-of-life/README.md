@@ -8,7 +8,7 @@ Rust, WebAssembly, WebXR
 
 ## Demo
 
-https://seikichi.github.io/sandbox/rust/wasm-3d-game-of-life
+https://seikichi.github.io/sandbox/rust/wasm-3d-game-of-life (or https://bit.ly/2qDcXqD)
 
 Also, please check [supported browsers](https://github.com/mozilla/webxr-polyfill#supported-browsers).
 
