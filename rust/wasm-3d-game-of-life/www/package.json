@@ -17,7 +17,8 @@
     "copy-webpack-plugin": "^5.0.0",
     "webpack": "^4.29.3",
     "webpack-cli": "^3.1.0",
-    "webpack-dev-server": "^3.1.5"
+    "webpack-dev-server": "^3.1.5",
+    "webpack-merge": "^4.2.2"
   },
   "homepage": "https://github.com/rustwasm/create-wasm-app#readme",
   "keywords": [
@@ -33,7 +34,7 @@
     "url": "git+https://github.com/rustwasm/create-wasm-app.git"
   },
   "scripts": {
-    "build": "webpack --config webpack.config.js",
-    "start": "webpack-dev-server"
+    "build": "webpack --config webpack.prod.js",
+    "start": "webpack-dev-server --config webpack.dev.js"
   }
 }

@@ -7,13 +7,8 @@ module.exports = {
     path: path.resolve(__dirname, "dist"),
     filename: "bootstrap.js"
   },
-  mode: "development",
   plugins: [new CopyWebpackPlugin(["index.html"])],
   resolve: {
     extensions: [".js", ".wasm"]
-  },
-  devServer: {
-    host: "0.0.0.0",
-    disableHostCheck: true
   }
 };
