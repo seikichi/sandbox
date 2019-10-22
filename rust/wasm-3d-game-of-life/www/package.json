@@ -1,42 +1,39 @@
 {
   "name": "create-wasm-app",
-  "version": "0.1.0",
   "description": "create an app to consume rust-generated wasm packages",
-  "main": "index.js",
+  "version": "0.1.0",
+  "author": "Ashley Williams <ashley666ashley@gmail.com>",
   "bin": {
     "create-wasm-app": ".bin/create-wasm-app.js"
   },
-  "scripts": {
-    "build": "webpack --config webpack.config.js",
-    "start": "webpack-dev-server"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/rustwasm/create-wasm-app.git"
-  },
-  "keywords": [
-    "webassembly",
-    "wasm",
-    "rust",
-    "webpack"
-  ],
-  "author": "Ashley Williams <ashley666ashley@gmail.com>",
-  "license": "(MIT OR Apache-2.0)",
   "bugs": {
     "url": "https://github.com/rustwasm/create-wasm-app/issues"
   },
-  "homepage": "https://github.com/rustwasm/create-wasm-app#readme",
+  "dependencies": {
+    "three": "^0.109.0",
+    "wasm-3d-game-of-life": "file:../pkg"
+  },
   "devDependencies": {
     "copy-webpack-plugin": "^5.0.0",
-    "ts-loader": "^6.2.0",
-    "typescript": "^3.6.4",
     "webpack": "^4.29.3",
     "webpack-cli": "^3.1.0",
     "webpack-dev-server": "^3.1.5"
   },
-  "dependencies": {
-    "three": "^0.109.0",
-    "three.xr.js": "git+https://github.com/mozilla/three.xr.js.git",
-    "wasm-3d-game-of-life": "file:../pkg"
+  "homepage": "https://github.com/rustwasm/create-wasm-app#readme",
+  "keywords": [
+    "rust",
+    "wasm",
+    "webassembly",
+    "webpack"
+  ],
+  "license": "(MIT OR Apache-2.0)",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rustwasm/create-wasm-app.git"
+  },
+  "scripts": {
+    "build": "webpack --config webpack.config.js",
+    "start": "webpack-dev-server"
   }
 }
