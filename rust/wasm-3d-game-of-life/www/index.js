@@ -57,8 +57,8 @@ class ARSimplestExample extends XRExampleBase {
   async updateScene(frame) {
     // update universe
     this.universe.tick();
-    const width = this.universe.width();
-    const height = this.universe.width();
+    const width = CELL_LENS;
+    const height = CELL_LENS;
     const memory_cells = new Uint8Array(
       memory.buffer,
       this.universe.cells(),
