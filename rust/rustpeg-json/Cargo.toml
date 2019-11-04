@@ -1,0 +1,11 @@
+[package]
+name = "rustpeg-json"
+version = "0.1.0"
+authors = ["Seikichi KONDO <seikichi@kmc.gr.jp>"]
+edition = "2018"
+
+[dependencies]
+peg = "0.5"
+
+[build-dependencies]
+peg = "0.5"

@@ -1,0 +1,55 @@
+// https://developer.mozilla.org/ja/docs/Web/JavaScript/Reference/Global_Objects/JSON
+
+use super::Json;
+use std::collections::HashMap;
+
+pub json -> Json
+  = "null"   { Json::Null }
+  / "true"   { Json::Boolean(true) }
+  / "false"  { Json::Boolean(false) }
+  / n:number { Json::Number(n) }
+  / s:string { Json::String(s) }
+  / a:array  { Json::Array(a) }
+  / o:object { Json::Object(o) }
+
+// Number
+number -> f64
+  = n:$("-"? int frac? exp?) { n.parse::<f64>().unwrap() }
+
+int = "0" / [1-9][0-9]*
+frac = "." [0-9]+
+exp = ("e" / "E") ("-" / "+")? [0-9]+
+
+// Array
+array -> Vec<Json>
+  = _ "[" _ a:(json ** (_ "," _)) _ "]" _ { a }
+
+// Object
+object -> Box<HashMap<String, Json>>
+  = _ "{" _ o:(member ** (_ "," _)) _ "}" _ { Box::new(o.into_iter().collect()) }
+
+member -> (String, Json)
+  = key:string _ ":" _ value:json { (key, value) }
+
+// Misc
+_ = [ \t\r\n]*
+
+// String
+string -> String
+  = '"' s:(normal / escape)* '"' { s.into_iter().collect() }
+
+normal -> char
+  = s:$([^\\"\x00-\x1F]) { s.chars().next().unwrap() }
+
+escape -> char
+  = "\\\"" { '"' }
+  / "\\/"  { '/' }
+  / "\\\\" { '\\' }
+  / "\\b"  { '\u{0008}' }
+  / "\\f"  { '\u{000C}' }
+  / "\\n"  { '\n' }
+  / "\\r"  { '\r' }
+  / "\\t"  { '\t' }
+  / "\\u" s:$([0-9A-Fa-f]*<4>) {
+    std::char::from_u32(u32::from_str_radix(s, 16).unwrap()).unwrap()
+  }
