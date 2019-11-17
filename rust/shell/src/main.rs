@@ -1,3 +1,4 @@
+use std::env::current_dir;
 use std::error::Error;
 use std::ffi::CString;
 use std::fs::File;
@@ -5,8 +6,9 @@ use std::io::prelude::*;
 use std::io::{stdin, stdout};
 use std::os::unix::io::{AsRawFd, IntoRawFd};
 
+use dirs::home_dir;
 use nix::sys::wait::wait;
-use nix::unistd::{close, dup2, execv, fork, pipe, ForkResult};
+use nix::unistd::{chdir, close, dup2, execvp, fork, pipe, ForkResult};
 use peg::parser;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -14,7 +16,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut lines = stdin.lock().lines();
 
     loop {
-        print!("> ");
+        print!("{} $ ", current_dir()?.to_str().unwrap());
         stdout().flush()?;
 
         let next = lines.next();
@@ -22,13 +24,36 @@ fn main() -> Result<(), Box<dyn Error>> {
             break;
         }
         let line = next.unwrap()?;
+        if line.trim().is_empty() {
+            continue;
+        }
+
+        let command = shell::command(&line).unwrap();
+
+        if let Command::Execute { argv } = &command {
+            if argv[0] == "exit" {
+                break;
+            }
+            if argv[0] == "cd" && argv.len() == 1 {
+                let path = home_dir().unwrap();
+                if chdir(&path).is_err() {
+                    eprintln!("failed to change directory");
+                }
+                continue;
+            }
+            if argv[0] == "cd" && argv.len() == 2 {
+                if chdir(argv[1].as_str()).is_err() {
+                    eprintln!("failed to change directory");
+                }
+                continue;
+            }
+        }
 
         match fork() {
             Ok(ForkResult::Parent { .. }) => {
                 wait()?;
             }
             Ok(ForkResult::Child) => {
-                let command = shell::command(&line).unwrap();
                 command.run()?;
             }
             Err(_) => panic!("fork failed"),
@@ -63,7 +88,7 @@ impl Command {
                     .iter()
                     .map(|s| CString::new(s.as_str()).unwrap())
                     .collect::<Vec<CString>>();
-                let result = execv(&path, &argv);
+                let result = execvp(&path, &argv);
                 if result.is_err() {
                     eprintln!("Error: {:?}", result);
                 }
@@ -87,19 +112,18 @@ impl Command {
                 let (input, output) = pipe()?;
                 match fork() {
                     Ok(ForkResult::Parent { .. }) => {
-                        close(input)?;
-                        dup2(output, stdout().as_raw_fd())?;
-                        left.run()?;
-                    }
-                    Ok(ForkResult::Child) => {
                         close(output)?;
                         dup2(input, stdin().as_raw_fd())?;
                         right.run()?;
                     }
+                    Ok(ForkResult::Child) => {
+                        close(input)?;
+                        dup2(output, stdout().as_raw_fd())?;
+                        left.run()?;
+                    }
                     Err(_) => panic!("fork failed"),
                 }
             }
-            _ => eprintln!("not implemented: {:?}", self),
         }
 
         Ok(())
@@ -136,7 +160,18 @@ parser! {
         rule token() -> String
           = "<" { "<".into() }
           / ">" { ">".into() }
-          / t:$((!['<' | '>' | '|' | ' '] [_])+) { t.into() }
+          / ts:(unquoted() / double_quoted() / single_quoted())+ { ts.join("") }
+
+        rule unquoted() -> String
+          = t:$((!['<' | '>' | '|' | ' ' | '"' | '\''] [_])+) { t.into() }
+
+        // NOTE: don't support escape (e.g., "\"")
+        rule double_quoted() -> String
+          = ['"'] s:$((!['"'] [_])+) ['"'] { s.into() }
+
+        // NOTE: don't support escape (e.g., '\'')
+        rule single_quoted() -> String
+          = "'" s:$((!['\''] [_])+) "'" { s.into() }
 
         rule sep() = [' ' | '\t' | '\n']*
     }
@@ -153,6 +188,17 @@ mod tests {
             command,
             Command::Execute {
                 argv: vec!["echo".into(), "foo".into(), "bar".into()]
+            }
+        );
+    }
+
+    #[test]
+    fn test_escape() {
+        let command = shell::command(r###"echo "FOO" 'BAR' "FOO"'BAR'"###).unwrap();
+        assert_eq!(
+            command,
+            Command::Execute {
+                argv: vec!["echo".into(), "FOO".into(), "BAR".into(), "FOOBAR".into()]
             }
         );
     }
