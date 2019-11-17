@@ -1,7 +1,11 @@
-use peg::parser;
 use std::error::Error;
+use std::ffi::CString;
 use std::io::prelude::*;
 use std::io::{stdin, stdout};
+
+use nix::sys::wait::wait;
+use nix::unistd::{execv, fork, ForkResult};
+use peg::parser;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let stdin = stdin();
@@ -11,11 +15,21 @@ fn main() -> Result<(), Box<dyn Error>> {
         print!("> ");
         stdout().flush()?;
 
-        if let Some(line) = lines.next() {
-            let command = shell::command(&line?)?;
-            println!("{:?}", command);
-        } else {
+        let next = lines.next();
+        if next.is_none() {
             break;
+        }
+        let line = next.unwrap()?;
+
+        match fork() {
+            Ok(ForkResult::Parent { .. }) => {
+                wait()?;
+            }
+            Ok(ForkResult::Child) => {
+                let command = shell::command(&line).unwrap();
+                command.run()?;
+            }
+            Err(_) => panic!("fork failed"),
         }
     }
 
@@ -36,6 +50,27 @@ pub enum Command {
         op: char,
         file: String,
     },
+}
+
+impl Command {
+    pub fn run(&self) -> Result<(), Box<dyn Error>> {
+        match &self {
+            Command::Execute { argv } => {
+                let path = CString::new(argv[0].clone())?;
+                let argv = argv
+                    .iter()
+                    .map(|s| CString::new(s.as_str()).unwrap())
+                    .collect::<Vec<CString>>();
+                let result = execv(&path, &argv);
+                if result.is_err() {
+                    eprintln!("Error: {:?}", result);
+                }
+            }
+            _ => eprintln!("not implemented: {:?}", self),
+        }
+
+        Ok(())
+    }
 }
 
 fn parse_redirect(tokens: &[String]) -> Command {
