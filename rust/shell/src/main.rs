@@ -1,10 +1,12 @@
 use std::error::Error;
 use std::ffi::CString;
+use std::fs::File;
 use std::io::prelude::*;
 use std::io::{stdin, stdout};
+use std::os::unix::io::{AsRawFd, IntoRawFd};
 
 use nix::sys::wait::wait;
-use nix::unistd::{execv, fork, ForkResult};
+use nix::unistd::{dup2, execv, fork, ForkResult};
 use peg::parser;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -64,6 +66,21 @@ impl Command {
                 let result = execv(&path, &argv);
                 if result.is_err() {
                     eprintln!("Error: {:?}", result);
+                }
+            }
+            Command::Redirect { op, file, command } => {
+                if *op == '<' {
+                    let file = File::open(file)?;
+                    let fd = file.into_raw_fd();
+                    dup2(fd, stdin().as_raw_fd())?;
+                    command.run()?;
+                } else if *op == '>' {
+                    let file = File::create(file)?;
+                    let fd = file.into_raw_fd();
+                    dup2(fd, stdout().as_raw_fd())?;
+                    command.run()?;
+                } else {
+                    command.run()?;
                 }
             }
             _ => eprintln!("not implemented: {:?}", self),
