@@ -6,7 +6,7 @@ use std::io::{stdin, stdout};
 use std::os::unix::io::{AsRawFd, IntoRawFd};
 
 use nix::sys::wait::wait;
-use nix::unistd::{dup2, execv, fork, ForkResult};
+use nix::unistd::{close, dup2, execv, fork, pipe, ForkResult};
 use peg::parser;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -81,6 +81,22 @@ impl Command {
                     command.run()?;
                 } else {
                     command.run()?;
+                }
+            }
+            Command::Pipe { left, right } => {
+                let (input, output) = pipe()?;
+                match fork() {
+                    Ok(ForkResult::Parent { .. }) => {
+                        close(input)?;
+                        dup2(output, stdout().as_raw_fd())?;
+                        left.run()?;
+                    }
+                    Ok(ForkResult::Child) => {
+                        close(output)?;
+                        dup2(input, stdin().as_raw_fd())?;
+                        right.run()?;
+                    }
+                    Err(_) => panic!("fork failed"),
                 }
             }
             _ => eprintln!("not implemented: {:?}", self),
