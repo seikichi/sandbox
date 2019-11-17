@@ -16,11 +16,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut lines = stdin.lock().lines();
 
     loop {
-        print!("{} $ ", current_dir()?.to_str().unwrap());
+        print!("{}% ", current_dir()?.to_str().unwrap());
         stdout().flush()?;
 
         let next = lines.next();
-        if next.is_none() {
+        if next.is_none() || next.as_ref().unwrap().is_err() {
             break;
         }
         let line = next.unwrap()?;
@@ -30,6 +30,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         let command = shell::command(&line).unwrap();
 
+        // TODO: refactor builtin commands...
         if let Command::Execute { argv } = &command {
             if argv[0] == "exit" {
                 break;
@@ -147,7 +148,7 @@ parser! {
     grammar shell() for str {
         pub rule command() -> Command
           = pipe:pipe() { pipe }
-          / exec:execute() { exec }
+        / exec:execute() { exec }
 
         rule execute() -> Command
           = argv:(sep() arg:token() { arg })+ { parse_redirect(&argv) }
