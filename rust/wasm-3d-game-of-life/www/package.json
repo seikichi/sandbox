@@ -10,7 +10,7 @@
     "url": "https://github.com/rustwasm/create-wasm-app/issues"
   },
   "dependencies": {
-    "three": "^0.109.0",
+    "three": "^0.125.0",
     "wasm-3d-game-of-life": "file:../pkg"
   },
   "devDependencies": {
