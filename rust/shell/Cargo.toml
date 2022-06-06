@@ -6,5 +6,5 @@ edition = "2018"
 
 [dependencies]
 peg = "0.6"
-nix = "0.15"
+nix = "0.20"
 dirs = "2.0"
